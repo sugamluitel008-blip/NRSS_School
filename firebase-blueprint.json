@@ -1,0 +1,111 @@
+{
+  "entities": {
+    "User": {
+      "collection": "users",
+      "fields": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "email": { "type": "string" },
+        "avatar": { "type": "string" },
+        "gradeOrDept": { "type": "string" },
+        "studentId": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "dob": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "ChatMessage": {
+      "collection": "chat_messages",
+      "fields": {
+        "id": { "type": "string" },
+        "roomId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderRole": { "type": "string" },
+        "senderAvatar": { "type": "string" },
+        "senderTitle": { "type": "string" },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "attachment": { "type": "map" },
+        "reactions": { "type": "map" },
+        "createdAt": { "type": "number" }
+      }
+    },
+    "ChatRoom": {
+      "collection": "chat_rooms",
+      "fields": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "icon": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "access": { "type": "string" },
+        "category": { "type": "string" }
+      }
+    },
+    "SchoolUpdate": {
+      "collection": "school_updates",
+      "fields": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorRole": { "type": "string" },
+        "authorAvatar": { "type": "string" },
+        "category": { "type": "string" },
+        "priority": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "pinned": { "type": "boolean" },
+        "targetAudience": { "type": "string" },
+        "attachments": { "type": "array" },
+        "createdAt": { "type": "number" }
+      }
+    },
+    "SupportTicket": {
+      "collection": "support_tickets",
+      "fields": {
+        "id": { "type": "string" },
+        "ticketNumber": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userRole": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "subject": { "type": "string" },
+        "category": { "type": "string" },
+        "priority": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "description": { "type": "string" },
+        "replies": { "type": "array" }
+      }
+    },
+    "SchoolMeta": {
+      "collection": "school_meta",
+      "fields": {
+        "isSchoolOpen": { "type": "boolean" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "TeacherProfile": {
+      "collection": "teachers",
+      "fields": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "photo": { "type": "string" },
+        "dob": { "type": "string" },
+        "age": { "type": "number" },
+        "department": { "type": "string" },
+        "roleTitle": { "type": "string" },
+        "qualification": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "experience": { "type": "string" },
+        "roleRank": { "type": "number" },
+        "createdAt": { "type": "number" }
+      }
+    }
+  }
+}

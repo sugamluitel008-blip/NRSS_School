@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // User profile documents
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+    
+    // Real-time Chat Messages
+    match /chat_messages/{messageId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+    
+    // Chat Rooms Configuration
+    match /chat_rooms/{roomId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // School Announcements and Official Updates
+    match /school_updates/{updateId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // Support Tickets & Inquiries
+    match /support_tickets/{ticketId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // Teachers & Faculty Profiles Directory
+    match /teachers/{teacherId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // School Global Status Meta
+    match /school_meta/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}
