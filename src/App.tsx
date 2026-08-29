@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, ActiveTab, ChatRoom, ChatMessage, SchoolUpdate, SupportTicket, TeacherProfile } from './types';
+import { User, ActiveTab, ChatRoom, ChatMessage, SchoolUpdate, SupportTicket, TeacherProfile, AdminRequest, CampusPhoto } from './types';
 import {
   subscribeToAuthProfile,
   signOutUserAccount,
@@ -22,13 +22,17 @@ import {
   createSupportTicketInDb,
   addTicketReplyInDb,
   updateSupportTicketStatusInDb,
+  deleteSupportTicketInDb,
   subscribeToSchoolStatus,
   toggleSchoolStatusInDb,
   subscribeToTeacherProfiles,
   addTeacherProfileToDb,
   updateTeacherProfileInDb,
   deleteTeacherProfileFromDb,
-  clearAllTeacherProfilesFromDb
+  clearAllTeacherProfilesFromDb,
+  subscribeToAdminRequests,
+  subscribeToCampusPhotos,
+  INITIAL_CAMPUS_PHOTOS
 } from './lib/firebase';
 import { AuthScreen } from './components/AuthScreen';
 import { Navbar } from './components/Navbar';
@@ -38,7 +42,10 @@ import { SchoolChatView } from './components/SchoolChatView';
 import { SchoolUpdatesView } from './components/SchoolUpdatesView';
 import { TeachersDirectoryView } from './components/TeachersDirectoryView';
 import { ContactUsView } from './components/ContactUsView';
+import { RoutinesView } from './components/RoutinesView';
+import { StaffToolsView } from './components/StaffToolsView';
 import { EditProfileModal } from './components/EditProfileModal';
+import { AdminQueueModal } from './components/AdminQueueModal';
 import { motion, AnimatePresence } from 'motion/react';
 import { Loader2 } from 'lucide-react';
 
@@ -47,6 +54,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isAdminQueueModalOpen, setIsAdminQueueModalOpen] = useState(false);
 
   // Navigation State (defaults to 'about')
   const [activeTab, setActiveTab] = useState<ActiveTab>('about');
@@ -58,6 +66,8 @@ export default function App() {
   const [updates, setUpdates] = useState<SchoolUpdate[]>([]);
   const [teachers, setTeachers] = useState<TeacherProfile[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [adminRequests, setAdminRequests] = useState<AdminRequest[]>([]);
+  const [campusPhotos, setCampusPhotos] = useState<CampusPhoto[]>(INITIAL_CAMPUS_PHOTOS);
   const [isSchoolOpen, setIsSchoolOpen] = useState<boolean>(true);
 
   // Subscribe to Firebase Auth
@@ -95,6 +105,14 @@ export default function App() {
       setIsSchoolOpen(status);
     });
 
+    const unsubAdminReqs = subscribeToAdminRequests((reqs) => {
+      setAdminRequests(reqs);
+    });
+
+    const unsubPhotos = subscribeToCampusPhotos((photos) => {
+      setCampusPhotos(photos);
+    });
+
     return () => {
       unsubMessages();
       unsubRooms();
@@ -102,6 +120,8 @@ export default function App() {
       unsubTeachers();
       unsubTickets();
       unsubStatus();
+      unsubAdminReqs();
+      unsubPhotos();
     };
   }, []);
 
@@ -278,6 +298,10 @@ export default function App() {
     await updateSupportTicketStatusInDb(ticketId, newStatus);
   };
 
+  const handleDeleteTicket = async (ticketId: string) => {
+    await deleteSupportTicketInDb(ticketId);
+  };
+
   const handleToggleSchoolStatus = async () => {
     await toggleSchoolStatusInDb(!isSchoolOpen);
   };
@@ -297,6 +321,8 @@ export default function App() {
     return <AuthScreen onLogin={handleLogin} />;
   }
 
+  const pendingAdminRequestsCount = adminRequests.filter(r => r.status === 'pending').length;
+
   return (
     <div
       id="school-portal-root"
@@ -312,6 +338,9 @@ export default function App() {
         onToggleSidebar={() => setIsSidebarOpen(true)}
         onLogout={handleLogout}
         onOpenProfileModal={() => setIsProfileModalOpen(true)}
+        onOpenAdminQueue={() => setIsAdminQueueModalOpen(true)}
+        onNavigateToStaffTools={() => setActiveTab('staff-tools')}
+        pendingAdminRequestsCount={pendingAdminRequestsCount}
         activeTab={activeTab}
       />
 
@@ -324,6 +353,8 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         onOpenProfileModal={() => setIsProfileModalOpen(true)}
+        onOpenAdminQueue={() => setIsAdminQueueModalOpen(true)}
+        pendingAdminRequestsCount={pendingAdminRequestsCount}
         updatesCount={updates.filter(u => u.priority === 'urgent').length}
       />
 
@@ -338,12 +369,23 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* Faculty / Admin Queue & Account Verification Modal */}
+      <AnimatePresence>
+        {isAdminQueueModalOpen && (
+          <AdminQueueModal
+            requests={adminRequests}
+            currentUser={currentUser}
+            onClose={() => setIsAdminQueueModalOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Main Content View with Smooth Transitions */}
       <main
         className={`w-full mx-auto ${
           activeTab === 'chat'
-            ? 'flex-1 min-h-0 max-w-7xl px-2 sm:px-4 py-2 overflow-hidden flex flex-col'
-            : 'flex-1 max-w-7xl px-4 sm:px-6 py-6'
+            ? 'flex-1 min-h-0 max-w-7xl px-1.5 sm:px-4 py-1.5 sm:py-2 overflow-hidden flex flex-col'
+            : 'flex-1 max-w-7xl px-3 sm:px-6 py-4 sm:py-6'
         }`}
       >
         <AnimatePresence mode="wait">
@@ -359,9 +401,28 @@ export default function App() {
                 onExploreChat={() => setActiveTab('chat')}
                 onExploreUpdates={() => setActiveTab('updates')}
                 onExploreTeachers={() => setActiveTab('teachers')}
+                onOpenAdminQueue={() => setIsAdminQueueModalOpen(true)}
+                pendingAdminRequestsCount={pendingAdminRequestsCount}
                 isSchoolOpen={isSchoolOpen}
                 onToggleSchoolStatus={handleToggleSchoolStatus}
                 currentUser={currentUser}
+                campusPhotos={campusPhotos}
+              />
+            </motion.div>
+          )}
+
+          {activeTab === 'staff-tools' && (
+            <motion.div
+              key="staff-tools-view"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18 }}
+            >
+              <StaffToolsView
+                currentUser={currentUser}
+                adminRequests={adminRequests}
+                campusPhotos={campusPhotos}
               />
             </motion.div>
           )}
@@ -410,6 +471,23 @@ export default function App() {
             </motion.div>
           )}
 
+          {activeTab === 'routines' && (
+            <motion.div
+              key="routines-view"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18 }}
+            >
+              <RoutinesView
+                currentUser={currentUser}
+                onNavigateToStaffTools={() => setActiveTab('staff-tools')}
+                onNavigateToUpdates={() => setActiveTab('updates')}
+                onNavigateToAbout={() => setActiveTab('about')}
+              />
+            </motion.div>
+          )}
+
           {activeTab === 'teachers' && (
             <motion.div
               key="teachers-view"
@@ -443,6 +521,7 @@ export default function App() {
                 onCreateTicket={handleCreateTicket}
                 onAddTicketReply={handleAddTicketReply}
                 onUpdateTicketStatus={handleUpdateTicketStatus}
+                onDeleteTicket={handleDeleteTicket}
               />
             </motion.div>
           )}

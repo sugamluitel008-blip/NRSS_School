@@ -1,6 +1,6 @@
 {
   "name": "NRSS Academy Portal",
-  "description": "Official school management portal for NRSS Academy students and faculty featuring school chat rooms, administrative updates, teacher directory, and live helpdesk support.",
+  "description": "Official school management portal for NRSS Academy students and faculty featuring school chat rooms, administrative updates, teacher directory, PIN-protected password recovery, admin account verification queue, and live helpdesk support.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

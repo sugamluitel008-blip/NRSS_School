@@ -42,5 +42,23 @@ service cloud.firestore {
       allow read: if true;
       allow write: if true;
     }
+    
+    // Admin Account Creation Verification Queue
+    match /admin_requests/{requestId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // School Campus & Showcase Photos Gallery
+    match /campus_photos/{photoId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // Class Routines & Timetables (Grades 1-12)
+    match /class_routines/{routineId} {
+      allow read: if true;
+      allow write: if true;
+    }
   }
 }

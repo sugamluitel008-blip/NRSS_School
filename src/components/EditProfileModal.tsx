@@ -154,17 +154,46 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError('File size must be under 5MB.');
-      return;
-    }
-
     setError('');
     const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setAvatar(reader.result);
-      }
+      const rawDataUrl = reader.result as string;
+      if (!rawDataUrl) return;
+
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_SIZE = 320;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height = Math.round(height * (MAX_SIZE / width));
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width = Math.round(width * (MAX_SIZE / height));
+            height = MAX_SIZE;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.85);
+          setAvatar(compressed);
+        } else {
+          setAvatar(rawDataUrl);
+        }
+      };
+      img.onerror = () => setAvatar(rawDataUrl);
+      img.src = rawDataUrl;
     };
     reader.readAsDataURL(file);
     e.target.value = '';

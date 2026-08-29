@@ -4,7 +4,7 @@ import {
   Info,
   MessageSquare,
   Bell,
-  Users,
+  CalendarDays,
   Headphones,
   X,
   School,
@@ -14,7 +14,9 @@ import {
   ChevronRight,
   UserCheck,
   Camera,
-  Edit3
+  Edit3,
+  SlidersHorizontal,
+  Wrench
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -26,6 +28,8 @@ interface SidebarProps {
   currentUser: User;
   onLogout: () => void;
   onOpenProfileModal?: () => void;
+  onOpenAdminQueue?: () => void;
+  pendingAdminRequestsCount?: number;
   updatesCount?: number;
   chatCount?: number;
 }
@@ -38,11 +42,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentUser,
   onLogout,
   onOpenProfileModal,
+  onOpenAdminQueue,
+  pendingAdminRequestsCount = 0,
   updatesCount = 0
 }) => {
   const isStudent = currentUser.role === 'student';
 
-  const navItems = [
+  const baseNavItems = [
     {
       id: 'about' as ActiveTab,
       label: 'About Us',
@@ -63,10 +69,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30'
     },
     {
-      id: 'teachers' as ActiveTab,
-      label: 'Teachers Name and Photo',
-      icon: Users,
-      badge: null
+      id: 'routines' as ActiveTab,
+      label: 'Routines',
+      icon: CalendarDays,
+      badge: '1-12',
+      badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
     },
     {
       id: 'contact' as ActiveTab,
@@ -75,6 +82,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: null
     }
   ];
+
+  const adminNavItems = [
+    {
+      id: 'staff-tools' as ActiveTab,
+      label: 'Staff Tools',
+      icon: SlidersHorizontal,
+      badge: pendingAdminRequestsCount > 0 ? `${pendingAdminRequestsCount} Pending` : 'Admin',
+      badgeColor: pendingAdminRequestsCount > 0 
+        ? 'bg-amber-500 text-slate-950 border-amber-400 font-extrabold animate-pulse' 
+        : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+    }
+  ];
+
+  const navItems = isStudent ? baseNavItems : [...adminNavItems, ...baseNavItems];
 
   return (
     <AnimatePresence>

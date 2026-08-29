@@ -106,6 +106,57 @@
         "roleRank": { "type": "number" },
         "createdAt": { "type": "number" }
       }
+    },
+    "AdminRequest": {
+      "collection": "admin_requests",
+      "fields": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "passwordHash": { "type": "string" },
+        "department": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "dob": { "type": "string" },
+        "deviceId": { "type": "string" },
+        "deviceModel": { "type": "string" },
+        "status": { "type": "string" },
+        "requestedAt": { "type": "string" },
+        "approvedBy": { "type": "string" },
+        "approvedAt": { "type": "string" },
+        "rejectionReason": { "type": "string" }
+      }
+    },
+    "CampusPhoto": {
+      "collection": "campus_photos",
+      "fields": {
+        "id": { "type": "string" },
+        "url": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "uploadedBy": { "type": "string" },
+        "uploadedAt": { "type": "string" },
+        "createdAt": { "type": "number" }
+      }
+    },
+    "ClassRoutine": {
+      "collection": "class_routines",
+      "fields": {
+        "id": { "type": "string" },
+        "grade": { "type": "string" },
+        "section": { "type": "string" },
+        "title": { "type": "string" },
+        "shift": { "type": "string" },
+        "roomNo": { "type": "string" },
+        "academicYear": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileType": { "type": "string" },
+        "notes": { "type": "string" },
+        "uploadedBy": { "type": "string" },
+        "uploadedAt": { "type": "string" },
+        "orderIndex": { "type": "number" },
+        "createdAt": { "type": "number" }
+      }
     }
   }
 }

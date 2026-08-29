@@ -10,6 +10,8 @@ export interface User {
   employeeId?: string;
   gradeOrDept?: string;
   dob?: string;
+  isSuspended?: boolean;
+  createdAt?: string;
 }
 
 export interface ChatMessage {
@@ -95,11 +97,60 @@ export interface SupportTicket {
   subject: string;
   category: 'Academic Inquiries' | 'IT & Portal Access' | 'Campus Facilities' | 'Fee & Accounts' | 'Extracurricular' | 'General';
   priority: 'Low' | 'Medium' | 'High' | 'Urgent';
-  status: 'Open' | 'In Progress' | 'Resolved';
+  status: 'Open' | 'In Progress' | 'Resolved' | 'Closed';
   createdAt: string;
   updatedAt: string;
   description: string;
   replies: TicketReply[];
 }
 
-export type ActiveTab = 'about' | 'chat' | 'updates' | 'teachers' | 'contact';
+export type ActiveTab = 'about' | 'chat' | 'updates' | 'routines' | 'contact' | 'staff-tools' | 'teachers';
+
+export type AdminRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface AdminRequest {
+  id: string;
+  name: string;
+  email: string;
+  passwordHash?: string;
+  department: string;
+  employeeId: string;
+  dob?: string;
+  deviceId: string;
+  deviceModel?: string;
+  status: AdminRequestStatus;
+  requestedAt: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
+}
+
+export interface CampusPhoto {
+  id: string;
+  url: string;
+  title: string;
+  description?: string;
+  uploadedBy?: string;
+  uploadedAt?: string;
+  createdAt?: number;
+}
+
+export interface ClassRoutine {
+  id: string;
+  grade: string; // e.g. "Grade 1", "Grade 2", "Grade 10", "Grade 11", "Grade 12"
+  section: string; // e.g. "Sec A", "Sec B", "Sec C", "Science A", "Management"
+  title: string; // e.g. "Grade 1 Sec A", "Grade 1 Sec B"
+  shift?: string; // e.g. "Morning Shift (6:30 AM - 11:30 AM)" or "Day Shift (10:00 AM - 4:00 PM)"
+  roomNo?: string; // e.g. "Room 101", "Science Wing 3"
+  academicYear?: string; // e.g. "2083 B.S."
+  imageUrl: string; // Direct image / converted high-res screenshot or visual timetable
+  fileName?: string; // Original uploaded document filename
+  fileType?: 'image' | 'pdf';
+  notes?: string; // Class notes, break times, teacher allocations
+  uploadedBy?: string;
+  uploadedAt?: string;
+  orderIndex: number;
+  createdAt: number;
+}
+
+

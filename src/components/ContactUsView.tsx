@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { User, SupportTicket, TicketReply } from '../types';
 import {
   Headphones,
@@ -16,7 +16,16 @@ import {
   Copy,
   Check,
   ShieldCheck,
-  GraduationCap
+  GraduationCap,
+  Trash2,
+  Lock,
+  Unlock,
+  FileText,
+  Download,
+  Share2,
+  AlertTriangle,
+  RotateCcw,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -26,6 +35,7 @@ interface ContactUsViewProps {
   onCreateTicket: (newTicket: Omit<SupportTicket, 'id' | 'ticketNumber' | 'createdAt' | 'updatedAt' | 'replies'>) => void;
   onAddTicketReply: (ticketId: string, replyContent: string) => void;
   onUpdateTicketStatus: (ticketId: string, newStatus: SupportTicket['status']) => void;
+  onDeleteTicket?: (ticketId: string) => void;
 }
 
 export const ContactUsView: React.FC<ContactUsViewProps> = ({
@@ -33,7 +43,8 @@ export const ContactUsView: React.FC<ContactUsViewProps> = ({
   tickets,
   onCreateTicket,
   onAddTicketReply,
-  onUpdateTicketStatus
+  onUpdateTicketStatus,
+  onDeleteTicket
 }) => {
   const isTeacher = currentUser.role === 'teacher';
 
@@ -43,13 +54,39 @@ export const ContactUsView: React.FC<ContactUsViewProps> = ({
   const [replyInput, setReplyInput] = useState('');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+  // Transcript state
+  const [showTranscriptModal, setShowTranscriptModal] = useState(false);
+  const [transcriptCopied, setTranscriptCopied] = useState(false);
+
+  // Delete ticket confirmation state
+  const [ticketToDelete, setTicketToDelete] = useState<SupportTicket | null>(null);
+
   // New ticket form state
   const [subject, setSubject] = useState('');
   const [category, setCategory] = useState<SupportTicket['category']>('Academic Inquiries');
   const [priority, setPriority] = useState<SupportTicket['priority']>('Medium');
   const [description, setDescription] = useState('');
 
-  // If student: see my tickets. If teacher: see all tickets with filter
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Keep selectedTicket synchronized with tickets prop (for real-time updates)
+  useEffect(() => {
+    if (selectedTicket) {
+      const updated = tickets.find(t => t.id === selectedTicket.id);
+      if (updated) {
+        setSelectedTicket(updated);
+      }
+    }
+  }, [tickets]);
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (selectedTicket) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [selectedTicket?.replies.length]);
+
+  // If student: see my tickets. If teacher: see all tickets
   const visibleTickets = isTeacher
     ? tickets
     : tickets.filter(t => t.userId === currentUser.id || t.userEmail === currentUser.email);
@@ -89,24 +126,92 @@ export const ContactUsView: React.FC<ContactUsViewProps> = ({
 
     onAddTicketReply(selectedTicket.id, replyInput.trim());
     setReplyInput('');
+  };
 
-    // Update locally for immediate reflection in active modal
-    setSelectedTicket(prev => {
-      if (!prev) return null;
-      const newReply: TicketReply = {
-        id: `rep_${Date.now()}`,
-        authorId: currentUser.id,
-        authorName: currentUser.name,
-        authorRole: currentUser.role,
-        authorAvatar: currentUser.avatar,
-        content: replyInput.trim(),
-        timestamp: 'Just now'
-      };
-      return {
-        ...prev,
-        replies: [...prev.replies, newReply]
-      };
-    });
+  const handleCloseTicket = (ticket: SupportTicket) => {
+    onUpdateTicketStatus(ticket.id, 'Closed');
+    setSelectedTicket(prev => prev && prev.id === ticket.id ? { ...prev, status: 'Closed' } : prev);
+  };
+
+  const handleReopenTicket = (ticket: SupportTicket) => {
+    onUpdateTicketStatus(ticket.id, 'Open');
+    setSelectedTicket(prev => prev && prev.id === ticket.id ? { ...prev, status: 'Open' } : prev);
+  };
+
+  const handleConfirmDeleteTicket = () => {
+    if (!ticketToDelete) return;
+    if (onDeleteTicket) {
+      onDeleteTicket(ticketToDelete.id);
+    }
+    if (selectedTicket?.id === ticketToDelete.id) {
+      setSelectedTicket(null);
+    }
+    setTicketToDelete(null);
+  };
+
+  // Transcript generation
+  const generateTranscriptText = (ticket: SupportTicket): string => {
+    const divider = '========================================================================';
+    const subDivider = '------------------------------------------------------------------------';
+    
+    let text = `${divider}\n`;
+    text += `N.R. COLLEGE & NEPAL RASTRIYA SECONDARY SCHOOL\n`;
+    text += `OFFICIAL SUPPORT HELPDESK TICKET TRANSCRIPT\n`;
+    text += `${divider}\n\n`;
+    text += `Ticket Number  : ${ticket.ticketNumber}\n`;
+    text += `Subject        : ${ticket.subject}\n`;
+    text += `Category       : ${ticket.category}\n`;
+    text += `Priority       : ${ticket.priority}\n`;
+    text += `Current Status : ${ticket.status.toUpperCase()}\n`;
+    text += `Submitted By   : ${ticket.userName} (${ticket.userRole.toUpperCase()})\n`;
+    text += `User Email     : ${ticket.userEmail}\n`;
+    text += `Date Created   : ${ticket.createdAt}\n`;
+    text += `Last Updated   : ${ticket.updatedAt || ticket.createdAt}\n\n`;
+    text += `${subDivider}\n`;
+    text += `INITIAL INQUIRY / PROBLEM DESCRIPTION:\n`;
+    text += `${subDivider}\n`;
+    text += `[${ticket.createdAt}] ${ticket.userName} (${ticket.userRole}):\n`;
+    text += `${ticket.description}\n\n`;
+
+    text += `${subDivider}\n`;
+    text += `COMMUNICATION LOG (${ticket.replies.length} REPLIES):\n`;
+    text += `${subDivider}\n`;
+
+    if (ticket.replies.length === 0) {
+      text += `No replies recorded yet.\n`;
+    } else {
+      ticket.replies.forEach((reply, index) => {
+        text += `[#${index + 1}] [${reply.timestamp}] ${reply.authorName} (${reply.authorRole}):\n`;
+        text += `${reply.content}\n\n`;
+      });
+    }
+
+    text += `${divider}\n`;
+    text += `TRANSCRIPT EXPORTED: ${new Date().toLocaleString()}\n`;
+    text += `Portal: NRSS Academy Helpdesk System (Tarakeshwor-11, Kathmandu)\n`;
+    text += `${divider}\n`;
+
+    return text;
+  };
+
+  const handleDownloadTranscript = (ticket: SupportTicket) => {
+    const transcript = generateTranscriptText(ticket);
+    const blob = new Blob([transcript], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Transcript_${ticket.ticketNumber}_${ticket.userName.replace(/\s+/g, '_')}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopyTranscript = (ticket: SupportTicket) => {
+    const transcript = generateTranscriptText(ticket);
+    navigator.clipboard.writeText(transcript);
+    setTranscriptCopied(true);
+    setTimeout(() => setTranscriptCopied(false), 2500);
   };
 
   const getStatusBadge = (status: SupportTicket['status']) => {
@@ -129,23 +234,29 @@ export const ContactUsView: React.FC<ContactUsViewProps> = ({
             <CheckCircle2 className="w-3 h-3" /> Resolved
           </span>
         );
+      case 'Closed':
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-700/50 text-slate-400 border border-slate-600 flex items-center gap-1">
+            <Lock className="w-3 h-3" /> Closed
+          </span>
+        );
     }
   };
 
   return (
     <div id="contact-support-view" className="space-y-8 pb-12">
       {/* Top Banner */}
-      <div className="p-6 sm:p-8 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+      <div className="p-4 sm:p-7 md:p-8 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950/30 to-slate-900 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold text-indigo-400 mb-1">
             <Headphones className="w-4 h-4" />
             Support Helpdesk & Communications
           </div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+          <h2 className="text-lg sm:text-2xl font-bold text-white tracking-tight">
             Contact Us & Live Ticket Support
           </h2>
           <p className="text-xs text-slate-400 mt-1 max-w-xl">
-            Submit a real-time assistance ticket, check resolution status, or get in touch with institutional departments directly.
+            Submit a real-time assistance ticket, chat live with support staff, manage tickets, and export full conversation transcripts.
           </p>
         </div>
 
@@ -154,7 +265,7 @@ export const ContactUsView: React.FC<ContactUsViewProps> = ({
             id="btn-open-new-ticket"
             type="button"
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition shadow-lg shadow-indigo-600/25 flex items-center gap-2"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2"
           >
             <PlusCircle className="w-4 h-4" />
             <span>Open New Support Ticket</span>
@@ -163,11 +274,11 @@ export const ContactUsView: React.FC<ContactUsViewProps> = ({
       </div>
 
       {/* Tabs: Live Support Desk vs Contact Phone/Email Directory */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto custom-scrollbar">
         <button
           type="button"
           onClick={() => setActiveTab('tickets')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-2 ${
             activeTab === 'tickets'
               ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
               : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
@@ -180,7 +291,7 @@ export const ContactUsView: React.FC<ContactUsViewProps> = ({
         <button
           type="button"
           onClick={() => setActiveTab('directory')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-2 ${
             activeTab === 'directory'
               ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
               : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
@@ -226,10 +337,12 @@ export const ContactUsView: React.FC<ContactUsViewProps> = ({
                 <div
                   key={ticket.id}
                   id={`support-ticket-${ticket.id}`}
-                  onClick={() => setSelectedTicket(ticket)}
-                  className="p-5 rounded-2xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/40 transition cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm group"
+                  className="p-5 rounded-2xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/40 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm group"
                 >
-                  <div className="space-y-1.5 min-w-0">
+                  <div
+                    onClick={() => setSelectedTicket(ticket)}
+                    className="space-y-1.5 min-w-0 flex-1 cursor-pointer"
+                  >
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs font-bold text-indigo-400">
                         {ticket.ticketNumber}
@@ -262,12 +375,27 @@ export const ContactUsView: React.FC<ContactUsViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  {/* Actions on Ticket Row */}
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                     <button
                       type="button"
-                      className="px-3 py-1.5 rounded-lg bg-slate-800 group-hover:bg-indigo-600 text-xs font-semibold text-slate-200 group-hover:text-white transition"
+                      onClick={() => setSelectedTicket(ticket)}
+                      className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white shadow-md shadow-indigo-600/20 transition flex items-center gap-1.5"
                     >
-                      Open Ticket Chat →
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Live Chat ({ticket.replies.length})</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTicketToDelete(ticket);
+                      }}
+                      className="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-900/50 transition"
+                      title="Delete Ticket"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -402,22 +530,61 @@ export const ContactUsView: React.FC<ContactUsViewProps> = ({
         </div>
       )}
 
-      {/* Modal: Live Ticket Chat & Status Management */}
+      {/* Modal: Live Ticket Chat & Full Management */}
       {selectedTicket && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-2xl space-y-4 max-h-[90vh] flex flex-col justify-between">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-3xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl flex flex-col h-[90vh] max-h-[750px] overflow-hidden">
             {/* Ticket Header */}
-            <div>
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold text-indigo-400">
+            <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-950/60 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="font-mono text-xs sm:text-sm font-extrabold text-indigo-400 px-2.5 py-1 rounded-lg bg-indigo-950/50 border border-indigo-800/60 shrink-0">
                     {selectedTicket.ticketNumber}
                   </span>
                   {getStatusBadge(selectedTicket.status)}
+                  <span className="px-2 py-0.5 rounded-md text-[10px] bg-slate-800 text-slate-300 border border-slate-700 hidden sm:inline-block">
+                    {selectedTicket.category}
+                  </span>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {/* If Teacher / Admin: Can update ticket status directly */}
+                {/* Top Action Bar: Transcript, Status & Close */}
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                  {/* Transcript Button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowTranscriptModal(true)}
+                    className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+                    title="Export or download ticket transcript"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                    <span className="hidden sm:inline">Take Transcript</span>
+                    <span className="sm:hidden">Transcript</span>
+                  </button>
+
+                  {/* Close / Reopen Ticket Button */}
+                  {selectedTicket.status !== 'Closed' ? (
+                    <button
+                      type="button"
+                      onClick={() => handleCloseTicket(selectedTicket)}
+                      className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-800 text-xs font-semibold flex items-center gap-1.5 transition"
+                      title="Close this ticket"
+                    >
+                      <Lock className="w-3.5 h-3.5 text-rose-400" />
+                      <span>Close</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleReopenTicket(selectedTicket)}
+                      className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-800 text-xs font-semibold flex items-center gap-1.5 transition"
+                      title="Reopen this ticket"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Reopen</span>
+                    </button>
+                  )}
+
+                  {/* Status Dropdown for Faculty */}
                   {isTeacher && (
                     <select
                       value={selectedTicket.status}
@@ -426,101 +593,256 @@ export const ContactUsView: React.FC<ContactUsViewProps> = ({
                         onUpdateTicketStatus(selectedTicket.id, newStatus);
                         setSelectedTicket(prev => prev ? { ...prev, status: newStatus } : null);
                       }}
-                      className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                      className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-semibold"
                     >
-                      <option value="Open">Status: Open</option>
-                      <option value="In Progress">Status: In Progress</option>
-                      <option value="Resolved">Status: Resolved</option>
+                      <option value="Open">Open</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Resolved">Resolved</option>
+                      <option value="Closed">Closed</option>
                     </select>
                   )}
+
+                  {/* Delete Button */}
+                  <button
+                    type="button"
+                    onClick={() => setTicketToDelete(selectedTicket)}
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-950/30 transition"
+                    title="Delete Ticket"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
 
                   <button
                     type="button"
                     onClick={() => setSelectedTicket(null)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-white"
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
                   >
                     <X className="w-5 h-5" />
                   </button>
                 </div>
               </div>
 
-              <div className="pt-3">
-                <h3 className="text-base font-bold text-white">
+              {/* Title & Requester Information */}
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-white tracking-tight truncate">
                   {selectedTicket.subject}
                 </h3>
-                <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
-                  <span>Category: <strong>{selectedTicket.category}</strong></span>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 mt-1">
+                  <span>Category: <strong className="text-slate-300">{selectedTicket.category}</strong></span>
                   <span>•</span>
-                  <span>Submitted by: {selectedTicket.userName}</span>
+                  <span>Requester: <strong className="text-slate-300">{selectedTicket.userName}</strong> ({selectedTicket.userRole})</span>
+                  <span>•</span>
+                  <span>Created: {selectedTicket.createdAt}</span>
                 </div>
               </div>
             </div>
 
-            {/* Conversation Feed */}
-            <div className="flex-1 overflow-y-auto space-y-3 p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 custom-scrollbar max-h-64 sm:max-h-80">
-              {/* Original Query Message */}
-              <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5 text-left">
-                <div className="flex items-center justify-between text-[11px] text-slate-400">
-                  <span className="font-semibold text-slate-200">{selectedTicket.userName} (Original Ticket Inquiry)</span>
-                  <span>{selectedTicket.createdAt}</span>
+            {/* Chat Conversation Thread */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 bg-slate-950/80 custom-scrollbar">
+              {/* Original Ticket Description Card (Inquiry Header) */}
+              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800/90 shadow-sm space-y-2 text-left">
+                <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800/80">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white">{selectedTicket.userName}</span>
+                    <span className={`px-2 py-0.2 rounded text-[10px] font-semibold ${
+                      selectedTicket.userRole === 'teacher'
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                    }`}>
+                      {selectedTicket.userRole === 'teacher' ? 'Faculty Admin' : 'Student'}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500">{selectedTicket.createdAt}</span>
                 </div>
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
+                <div className="text-xs font-semibold text-indigo-400">Original Inquiry Description:</div>
+                <p className="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
                   {selectedTicket.description}
                 </p>
               </div>
 
-              {/* Replies list */}
+              {/* Conversation Messages */}
               {selectedTicket.replies.map((reply) => {
-                const isMyReply = reply.authorId === currentUser.id;
+                const isMe = reply.authorId === currentUser.id;
+                const isFaculty = reply.authorRole === 'teacher' || reply.authorRole === 'support';
 
                 return (
                   <div
                     key={reply.id}
-                    className={`p-3 rounded-xl text-left space-y-1 border ${
-                      isMyReply
-                        ? 'bg-indigo-950/40 border-indigo-800/60 ml-6'
-                        : 'bg-slate-900 border-slate-800 mr-6'
-                    }`}
+                    className={`flex items-start gap-2.5 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
                   >
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-bold text-slate-200 flex items-center gap-1.5">
-                        {reply.authorName}
-                        {reply.authorRole === 'support' && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                            Support Staff
+                    <img
+                      src={reply.authorAvatar || (isFaculty ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80' : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80')}
+                      alt={reply.authorName}
+                      className="w-8 h-8 rounded-full object-cover border border-slate-700 shrink-0 mt-1"
+                    />
+
+                    <div className={`max-w-[82%] sm:max-w-[70%] space-y-1 ${isMe ? 'text-right' : 'text-left'}`}>
+                      <div className={`flex items-center gap-1.5 text-[11px] ${isMe ? 'justify-end' : 'justify-start'}`}>
+                        <span className="font-bold text-slate-200">{reply.authorName}</span>
+                        {isFaculty && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            Staff
                           </span>
                         )}
-                      </span>
-                      <span className="text-slate-500">{reply.timestamp}</span>
+                        <span className="text-slate-500 text-[10px]">• {reply.timestamp}</span>
+                      </div>
+
+                      <div
+                        className={`p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed whitespace-pre-wrap inline-block text-left shadow-sm ${
+                          isMe
+                            ? 'bg-indigo-600 text-white rounded-tr-none'
+                            : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-tl-none'
+                        }`}
+                      >
+                        {reply.content}
+                      </div>
                     </div>
-                    <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">
-                      {reply.content}
-                    </p>
                   </div>
                 );
               })}
+
+              <div ref={chatEndRef} />
             </div>
 
-            {/* Reply Input Form */}
-            <form onSubmit={handleReplySubmit} className="flex items-center gap-2 pt-2">
-              <input
-                id="input-ticket-reply"
-                type="text"
-                value={replyInput}
-                onChange={(e) => setReplyInput(e.target.value)}
-                placeholder="Type your response to this support ticket..."
-                className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-              />
-              <button
-                id="btn-send-ticket-reply"
-                type="submit"
-                disabled={!replyInput.trim()}
-                className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-semibold shadow-md shadow-indigo-600/25 flex items-center gap-1.5 shrink-0"
+            {/* Closed Ticket Notice or Live Reply Input */}
+            {selectedTicket.status === 'Closed' ? (
+              <div className="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 text-slate-400">
+                  <Lock className="w-4 h-4 text-slate-500" />
+                  <span>This support ticket is marked as <strong>Closed</strong>. You can take a transcript or reopen to continue chatting.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleReopenTicket(selectedTicket)}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shrink-0 transition"
+                >
+                  Reopen Ticket
+                </button>
+              </div>
+            ) : (
+              <form
+                onSubmit={handleReplySubmit}
+                className="p-3 sm:p-4 bg-slate-950/90 border-t border-slate-800 flex items-center gap-2"
               >
-                <Send className="w-4 h-4" />
-                <span>Reply</span>
+                <input
+                  id="input-ticket-reply"
+                  type="text"
+                  value={replyInput}
+                  onChange={(e) => setReplyInput(e.target.value)}
+                  placeholder="Type your response to this ticket (Enter to send)..."
+                  className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
+                />
+                <button
+                  id="btn-send-ticket-reply"
+                  type="submit"
+                  disabled={!replyInput.trim()}
+                  className="px-4 sm:px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs sm:text-sm font-semibold shadow-md shadow-indigo-600/25 flex items-center gap-1.5 shrink-0 transition"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Send</span>
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Transcript Taking & Export */}
+      {showTranscriptModal && selectedTicket && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col justify-between">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    Ticket Transcript ({selectedTicket.ticketNumber})
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Official conversation record ready for download or copy.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowTranscriptModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
               </button>
-            </form>
+            </div>
+
+            {/* Transcript Preview Box */}
+            <div className="flex-1 overflow-y-auto p-4 rounded-2xl bg-slate-950 border border-slate-800/90 font-mono text-[11px] sm:text-xs text-slate-300 whitespace-pre-wrap leading-relaxed custom-scrollbar max-h-96 select-all">
+              {generateTranscriptText(selectedTicket)}
+            </div>
+
+            {/* Transcript Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800">
+              <div className="text-xs text-slate-400">
+                Total messages logged: <strong>{selectedTicket.replies.length + 1}</strong>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleCopyTranscript(selectedTicket)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition"
+                >
+                  {transcriptCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  <span>{transcriptCopied ? 'Copied Transcript!' : 'Copy to Clipboard'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDownloadTranscript(selectedTicket)}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/25 flex items-center gap-1.5 transition"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download .TXT File</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Delete Confirmation Dialog */}
+      {ticketToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-slate-900 border border-rose-900/50 rounded-2xl p-6 shadow-2xl space-y-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-white">Delete Support Ticket?</h3>
+              <p className="text-xs text-slate-400">
+                Are you sure you want to permanently delete ticket <strong className="text-white font-mono">{ticketToDelete.ticketNumber}</strong>?
+                This will remove all associated chat messages and cannot be undone.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setTicketToDelete(null)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteTicket}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/25 flex items-center gap-1.5 transition"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Yes, Delete Ticket</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

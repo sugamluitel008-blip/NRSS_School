@@ -1,6 +1,14 @@
-import React, { useState } from 'react';
-import { User, UserRole } from '../types';
-import { registerUserAccount, signInUserAccount } from '../lib/firebase';
+import React, { useState, useEffect } from 'react';
+import { User, UserRole, AdminRequest } from '../types';
+import {
+  registerUserAccount,
+  signInUserAccount,
+  createAdminAccountRequest,
+  subscribeToDeviceAdminRequest,
+  LOCAL_STORAGE_PENDING_ADMIN_KEY
+} from '../lib/firebase';
+import { DeviceAdminRequestModal } from './DeviceAdminRequestModal';
+import { ForgotPasswordModal } from './ForgotPasswordModal';
 import {
   GraduationCap,
   ShieldCheck,
@@ -14,8 +22,12 @@ import {
   AlertCircle,
   Loader2,
   CheckCircle2,
+  Clock,
+  Smartphone,
+  Info,
   Calendar
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface AuthScreenProps {
   onLogin: (user: User) => void;
@@ -35,24 +47,70 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   const [customId, setCustomId] = useState('');
   const [dob, setDob] = useState('');
 
+  // Device Admin Request Tracking State
+  const [deviceRequestId, setDeviceRequestId] = useState<string>(() => {
+    try {
+      return localStorage.getItem(LOCAL_STORAGE_PENDING_ADMIN_KEY) || '';
+    } catch (e) {
+      return '';
+    }
+  });
+  const [deviceRequest, setDeviceRequest] = useState<AdminRequest | null>(null);
+  const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+  const [authSuccessBanner, setAuthSuccessBanner] = useState('');
+
+  // Subscribe to device's pending admin request in real time
+  useEffect(() => {
+    if (!deviceRequestId) {
+      setDeviceRequest(null);
+      return;
+    }
+
+    const unsubscribe = subscribeToDeviceAdminRequest(deviceRequestId, (req) => {
+      setDeviceRequest(req);
+      if (!req) {
+        setDeviceRequestId('');
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [deviceRequestId]);
+
   const formatFirebaseError = (err: any): string => {
     const code = err?.code || '';
-    switch (code) {
-      case 'auth/invalid-email':
-        return 'Please enter a valid email address.';
-      case 'auth/user-not-found':
-      case 'auth/wrong-password':
-      case 'auth/invalid-credential':
-        return 'Invalid email or password. Please check your credentials or create a new account.';
-      case 'auth/email-already-in-use':
-        return 'This email address is already registered. Please sign in instead.';
-      case 'auth/weak-password':
-        return 'Password should be at least 6 characters long.';
-      case 'auth/network-request-failed':
-        return 'Network connection failed. Please check your internet connection.';
-      default:
-        return err?.message || 'An unexpected error occurred during authentication.';
+    const message = (err?.message || '').replace('Firebase: ', '').trim();
+
+    if (
+      code === 'auth/wrong-password' ||
+      code === 'auth/invalid-credential' ||
+      message.toLowerCase().includes('invalid password') ||
+      message.toLowerCase().includes('wrong password')
+    ) {
+      return 'Invalid password. Please try again or use Forgot Password to reset it.';
     }
+    if (
+      code === 'auth/user-not-found' ||
+      message.toLowerCase().includes('no account found') ||
+      message.toLowerCase().includes('user not found')
+    ) {
+      return 'No account found with this email. Please check for typos or create an account.';
+    }
+    if (code === 'auth/invalid-email' || message.toLowerCase().includes('invalid email') || message.toLowerCase().includes('valid email')) {
+      return 'Please enter a valid institutional email address.';
+    }
+    if (code === 'auth/email-already-in-use' || message.toLowerCase().includes('already registered') || message.toLowerCase().includes('already in use')) {
+      return 'This email address is already registered. Please sign in instead.';
+    }
+    if (code === 'auth/weak-password' || message.toLowerCase().includes('6 characters')) {
+      return 'Password should be at least 6 characters long.';
+    }
+    if (code === 'auth/network-request-failed') {
+      return 'Network connection failed. Please check your internet connection.';
+    }
+    return message || 'Authentication failed. Please check your credentials and try again.';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -73,33 +131,93 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
     try {
       if (isRegisterMode) {
-        // Register new Firebase Account & Save Firestore User Profile
-        const newUser = await registerUserAccount({
-          email: email.trim(),
-          password: password,
-          name: fullName.trim(),
-          role: activeTab,
-          gradeOrDept: gradeOrDept.trim() || (activeTab === 'student' ? 'Grade 11 - General' : 'Faculty Member'),
-          studentId: activeTab === 'student' ? (customId.trim() || undefined) : undefined,
-          employeeId: activeTab === 'teacher' ? (customId.trim() || undefined) : undefined,
-          dob: dob || undefined
-        });
-        onLogin(newUser);
+        if (activeTab === 'teacher') {
+          // ADMIN CREATION QUEUE: Prevent students from self-assigning admin accounts.
+          // Place request in admin verification queue for existing administrators to approve.
+          const req = await createAdminAccountRequest({
+            name: fullName.trim(),
+            email: email.trim(),
+            password: password,
+            department: gradeOrDept.trim() || 'Faculty & Administration',
+            employeeId: customId.trim() || undefined,
+            dob: dob || undefined
+          });
+
+          setDeviceRequestId(req.id);
+          setDeviceRequest(req);
+          setIsDeviceModalOpen(true);
+        } else {
+          // Standard student registration
+          const newUser = await registerUserAccount({
+            email: email.trim(),
+            password: password,
+            name: fullName.trim(),
+            role: 'student',
+            gradeOrDept: gradeOrDept.trim() || 'Grade 11 - General',
+            studentId: customId.trim() || undefined,
+            dob: dob || undefined
+          });
+          onLogin(newUser);
+        }
       } else {
         // Sign in existing Firebase Account & Retrieve Profile from Firestore
         const user = await signInUserAccount(email.trim(), password);
         onLogin(user);
       }
     } catch (err: any) {
-      console.error('Firebase Auth Error:', err);
+      console.error('Auth Error:', err);
+      if (err?.adminRequest) {
+        setDeviceRequest(err.adminRequest);
+        setIsDeviceModalOpen(true);
+      }
       setError(formatFirebaseError(err));
     } finally {
       setLoading(false);
     }
   };
 
+  const handleDismissDeviceRequest = () => {
+    setDeviceRequestId('');
+    setDeviceRequest(null);
+  };
+
   return (
     <div id="auth-portal-wrapper" className="min-h-screen w-full bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-hidden">
+      {/* Device Admin Request Status Modal */}
+      <AnimatePresence>
+        {isDeviceModalOpen && deviceRequest && (
+          <DeviceAdminRequestModal
+            request={deviceRequest}
+            onClose={() => setIsDeviceModalOpen(false)}
+            onActivated={(user) => {
+              setIsDeviceModalOpen(false);
+              onLogin(user);
+            }}
+            onDismissRequest={handleDismissDeviceRequest}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Forgot Password Security Verification Modal */}
+      <AnimatePresence>
+        {isForgotPasswordOpen && (
+          <ForgotPasswordModal
+            initialEmail={email}
+            initialRole={activeTab}
+            onClose={() => setIsForgotPasswordOpen(false)}
+            onSuccess={(updatedEmail, newPass, updatedRole) => {
+              setEmail(updatedEmail);
+              setPassword(newPass);
+              setActiveTab(updatedRole);
+              setIsRegisterMode(false);
+              setIsForgotPasswordOpen(false);
+              setError('');
+              setAuthSuccessBanner('Password updated successfully! Click sign in to continue.');
+            }}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Background Decorative Ambient Glows */}
       <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute top-1/3 -right-40 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
@@ -151,7 +269,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                 Faculty & Admin Console
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Broadcast announcements, multi-channel discussions (Staff Lounge & Document Transfer), and support resolution.
+                Admin verification queue prevents unauthorized student registrations. Manage broadcasts and staff channels.
               </p>
             </div>
           </div>
@@ -197,21 +315,76 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${activeTab === 'student' ? 'bg-indigo-500' : 'bg-emerald-500'}`} />
                   {isRegisterMode
-                    ? `Create ${activeTab === 'student' ? 'Student' : 'Faculty'} Account`
+                    ? (activeTab === 'student' ? 'Create Student Account' : 'Apply for Faculty / Admin Account')
                     : `${activeTab === 'student' ? 'Student' : 'Faculty'} Sign In`}
                 </h3>
               </div>
               <p className="text-xs text-slate-400 mt-1">
                 {isRegisterMode
-                  ? 'Register your official profile on the cloud database.'
+                  ? (activeTab === 'student'
+                      ? 'Register your student profile for immediate portal access.'
+                      : 'Submit your faculty credentials to the verification queue.')
                   : 'Enter your verified account email and password to access the portal.'}
               </p>
             </div>
 
+            {/* Admin Security Warning in Register Mode */}
+            {isRegisterMode && activeTab === 'teacher' && (
+              <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200 text-xs flex items-start gap-2.5">
+                <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="leading-relaxed">
+                  <strong className="text-amber-300">Admin Queue Security:</strong> To ensure no students create unauthorized teacher accounts, faculty registrations are sent to the approval queue for existing admins to verify.
+                </div>
+              </div>
+            )}
+
+            {/* Auth Success Banner */}
+            {authSuccessBanner && (
+              <div className="mb-4 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs flex items-center justify-between gap-2 animate-in fade-in duration-200">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>{authSuccessBanner}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAuthSuccessBanner('')}
+                  className="text-[10px] text-emerald-300 hover:text-white underline font-semibold"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
             {error && (
-              <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5 animate-in fade-in duration-200">
-                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-                <span className="leading-snug">{error}</span>
+              <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs space-y-2 animate-in fade-in duration-200">
+                <div className="flex items-center gap-2.5">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <span className="leading-snug">{error}</span>
+                </div>
+                {/* Helpful recovery shortcuts if account not found or wrong password */}
+                <div className="pt-1.5 border-t border-rose-500/20 flex flex-wrap items-center gap-2 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsForgotPasswordOpen(true);
+                      setError('');
+                    }}
+                    className="px-2 py-0.5 rounded bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-200 font-semibold flex items-center gap-1 transition"
+                  >
+                    <KeyRound className="w-3 h-3" />
+                    <span>{activeTab === 'teacher' ? 'Forgot Password (Contact +9779869400576)' : 'Forgot Password (Reset with PIN)'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsRegisterMode(true);
+                      setError('');
+                    }}
+                    className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 transition"
+                  >
+                    Create Account
+                  </button>
+                </div>
               </div>
             )}
 
@@ -240,11 +413,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                        {activeTab === 'student' ? 'Grade / Program' : 'Department'}
+                        {activeTab === 'student' ? 'Grade / Program' : 'Department *'}
                       </label>
                       <input
                         id="input-reg-grade"
                         type="text"
+                        required={activeTab === 'teacher'}
                         value={gradeOrDept}
                         onChange={(e) => setGradeOrDept(e.target.value)}
                         placeholder={activeTab === 'student' ? 'Grade 11 - STEM' : 'Computer Science'}
@@ -254,11 +428,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
                     <div>
                       <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                        {activeTab === 'student' ? 'Student ID (Optional)' : 'Employee ID (Optional)'}
+                        {activeTab === 'student' ? 'Student ID (Optional)' : 'Employee ID *'}
                       </label>
                       <input
                         id="input-reg-id"
                         type="text"
+                        required={activeTab === 'teacher'}
                         value={customId}
                         onChange={(e) => setCustomId(e.target.value)}
                         placeholder={activeTab === 'student' ? 'STD-2083' : 'FAC-104'}
@@ -288,9 +463,25 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Password *
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-medium text-slate-300">
+                    Password *
+                  </label>
+                  {!isRegisterMode && (
+                    <button
+                      id="btn-link-forgot-password"
+                      type="button"
+                      onClick={() => {
+                        setIsForgotPasswordOpen(true);
+                        setError('');
+                      }}
+                      className="text-[11px] text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1 transition"
+                    >
+                      <KeyRound className="w-3 h-3" />
+                      <span>Forgot password?</span>
+                    </button>
+                  )}
+                </div>
                 <div className="relative">
                   <KeyRound className="w-4 h-4 absolute left-3 top-3 text-slate-500" />
                   <input
@@ -322,11 +513,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Connecting to Database...</span>
+                    <span>Processing Request...</span>
                   </>
                 ) : (
                   <>
-                    <span>{isRegisterMode ? `Register ${activeTab === 'student' ? 'Student' : 'Faculty'} Account` : `Sign In to ${activeTab === 'student' ? 'Student' : 'Faculty'} Portal`}</span>
+                    <span>
+                      {isRegisterMode
+                        ? (activeTab === 'student' ? 'Register Student Account' : 'Submit Admin Account to Queue')
+                        : `Sign In to ${activeTab === 'student' ? 'Student' : 'Faculty'} Portal`}
+                    </span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -344,7 +539,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
               >
                 {isRegisterMode ? 'Already registered? Sign In' : 'New user? Create Account'}
               </button>
-              <span className="text-slate-500 text-[11px]">Academic Year 2026</span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsForgotPasswordOpen(true);
+                  setError('');
+                }}
+                className="text-slate-400 hover:text-slate-200 transition text-[11px]"
+              >
+                Reset with PIN
+              </button>
             </div>
           </div>
         </div>
@@ -356,9 +561,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
         <div className="flex items-center gap-4">
           <span>Campus Helpdesk: (01) 425-8900</span>
           <span>•</span>
-          <span>Firebase Cloud Firestore Database</span>
+          <span>Admin Queue & Role Verification Active</span>
         </div>
       </footer>
     </div>
   );
 };
+

@@ -460,20 +460,66 @@ export const SchoolChatView: React.FC<SchoolChatViewProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const sizeStr =
-      file.size > 1024 * 1024
-        ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
-        : `${Math.round(file.size / 1024)} KB`;
-
     const reader = new FileReader();
     reader.onload = () => {
-      setAttachedFile({
-        name: file.name,
-        size: sizeStr,
-        type: 'image',
-        url: reader.result as string
-      });
-      setShowAttachMenu(false);
+      const rawDataUrl = reader.result as string;
+      if (!rawDataUrl) return;
+
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1000;
+        const MAX_HEIGHT = 1000;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height = Math.round(height * (MAX_WIDTH / width));
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width = Math.round(width * (MAX_HEIGHT / height));
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.82);
+          const sizeKb = Math.round((compressed.length * 0.75) / 1024);
+          setAttachedFile({
+            name: file.name,
+            size: `${sizeKb} KB`,
+            type: 'image',
+            url: compressed
+          });
+        } else {
+          setAttachedFile({
+            name: file.name,
+            size: `${Math.round(file.size / 1024)} KB`,
+            type: 'image',
+            url: rawDataUrl
+          });
+        }
+        setShowAttachMenu(false);
+      };
+      img.onerror = () => {
+        setAttachedFile({
+          name: file.name,
+          size: `${Math.round(file.size / 1024)} KB`,
+          type: 'image',
+          url: rawDataUrl
+        });
+        setShowAttachMenu(false);
+      };
+      img.src = rawDataUrl;
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -535,12 +581,71 @@ export const SchoolChatView: React.FC<SchoolChatViewProps> = ({
     const isImg = file.type.startsWith('image/');
     const reader = new FileReader();
     reader.onload = () => {
-      setAttachedFile({
-        name: file.name,
-        size: sizeStr,
-        type: isImg ? 'image' : file.name.endsWith('.pdf') ? 'pdf' : 'doc',
-        url: reader.result as string
-      });
+      const rawDataUrl = reader.result as string;
+      if (!rawDataUrl) return;
+
+      if (isImg) {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1000;
+          const MAX_HEIGHT = 1000;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height = Math.round(height * (MAX_WIDTH / width));
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width = Math.round(width * (MAX_HEIGHT / height));
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressed = canvas.toDataURL('image/jpeg', 0.82);
+            const sizeKb = Math.round((compressed.length * 0.75) / 1024);
+            setAttachedFile({
+              name: file.name,
+              size: `${sizeKb} KB`,
+              type: 'image',
+              url: compressed
+            });
+          } else {
+            setAttachedFile({
+              name: file.name,
+              size: sizeStr,
+              type: 'image',
+              url: rawDataUrl
+            });
+          }
+        };
+        img.onerror = () => {
+          setAttachedFile({
+            name: file.name,
+            size: sizeStr,
+            type: 'image',
+            url: rawDataUrl
+          });
+        };
+        img.src = rawDataUrl;
+      } else {
+        setAttachedFile({
+          name: file.name,
+          size: sizeStr,
+          type: file.name.endsWith('.pdf') ? 'pdf' : 'doc',
+          url: rawDataUrl
+        });
+      }
     };
     reader.readAsDataURL(file);
   };

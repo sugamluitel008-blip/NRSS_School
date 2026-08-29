@@ -262,13 +262,13 @@ export const SchoolUpdatesView: React.FC<SchoolUpdatesViewProps> = ({
       </AnimatePresence>
 
       {/* Top Banner & Management Bar */}
-      <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-indigo-950/40 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+      <div className="p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-indigo-950/40 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-xs font-semibold text-indigo-400">
             <Bell className="w-4 h-4 text-amber-400" />
             <span>NRSS Official Circulars & Bulletin Board</span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+          <h2 className="text-lg sm:text-2xl font-bold text-white tracking-tight">
             School Announcements & Updates
           </h2>
           <p className="text-xs text-slate-400 max-w-xl">
@@ -278,27 +278,24 @@ export const SchoolUpdatesView: React.FC<SchoolUpdatesViewProps> = ({
           </p>
 
           {/* Quick Metrics Bar */}
-          <div className="flex flex-wrap items-center gap-2 pt-2 text-[11px]">
-            <span className="px-2.5 py-0.5 rounded-md bg-slate-950 border border-slate-800 text-slate-300 font-medium">
+          <div className="flex flex-wrap items-center gap-2 pt-2 text-xs">
+            <span className="px-2.5 py-1 sm:py-0.5 rounded-md bg-slate-950 border border-slate-800 text-slate-300 font-medium">
               Total Notices: <strong className="text-white">{updates.length}</strong>
             </span>
-            <span className="px-2.5 py-0.5 rounded-md bg-indigo-950/60 border border-indigo-800/50 text-indigo-300 font-medium">
+            <span className="px-2.5 py-1 sm:py-0.5 rounded-md bg-indigo-950/60 border border-indigo-800/50 text-indigo-300 font-medium">
               Pinned: <strong>{pinnedCount}</strong>
             </span>
             {urgentCount > 0 && (
-              <span className="px-2.5 py-0.5 rounded-md bg-rose-950/60 border border-rose-800/50 text-rose-300 font-medium flex items-center gap-1">
+              <span className="px-2.5 py-1 sm:py-0.5 rounded-md bg-rose-950/60 border border-rose-800/50 text-rose-300 font-medium flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
                 Urgent: <strong>{urgentCount}</strong>
               </span>
             )}
             {bookmarkedIds.length > 0 && (
-              <span className="px-2.5 py-0.5 rounded-md bg-amber-950/60 border border-amber-800/50 text-amber-300 font-medium">
+              <span className="px-2.5 py-1 sm:py-0.5 rounded-md bg-amber-950/60 border border-amber-800/50 text-amber-300 font-medium">
                 Saved by You: <strong>{bookmarkedIds.length}</strong>
               </span>
             )}
-            <span className="px-2.5 py-0.5 rounded-md bg-slate-950/80 border border-slate-800 text-slate-400 font-medium">
-              📢 Active Broadcasts: 0
-            </span>
           </div>
         </div>
 
@@ -310,7 +307,7 @@ export const SchoolUpdatesView: React.FC<SchoolUpdatesViewProps> = ({
                 id="btn-post-new-announcement"
                 type="button"
                 onClick={openCreateModal}
-                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition shadow-lg shadow-emerald-600/25 flex items-center gap-2"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2"
               >
                 <PlusCircle className="w-4 h-4" />
                 <span>Post New Announcement</span>
@@ -320,7 +317,7 @@ export const SchoolUpdatesView: React.FC<SchoolUpdatesViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowClearConfirmModal(true)}
-                className="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-medium text-xs border border-slate-700 transition flex items-center gap-1.5"
+                className="w-full sm:w-auto px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-medium text-xs border border-slate-700 transition flex items-center justify-center gap-1.5"
                 title="Board cleaning & reset options"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -336,9 +333,9 @@ export const SchoolUpdatesView: React.FC<SchoolUpdatesViewProps> = ({
       </div>
 
       {/* Simplified Category & Filter Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/60 p-2.5 sm:p-3 rounded-2xl border border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-2xl border border-slate-800">
         {/* Simplified Core Categories */}
-        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto custom-scrollbar">
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto custom-scrollbar pb-1 sm:pb-0">
           {categories.map((cat) => (
             <button
               key={cat}
@@ -347,7 +344,7 @@ export const SchoolUpdatesView: React.FC<SchoolUpdatesViewProps> = ({
                 setSelectedCategory(cat);
                 setFilterView('all');
               }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
+              className={`px-3 py-2 sm:py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
                 selectedCategory === cat && filterView === 'all'
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
                   : 'bg-slate-950 text-slate-400 hover:text-white hover:bg-slate-900 border border-slate-800'
@@ -363,7 +360,7 @@ export const SchoolUpdatesView: React.FC<SchoolUpdatesViewProps> = ({
           <button
             type="button"
             onClick={() => setFilterView(filterView === 'pinned' ? 'all' : 'pinned')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 ${
+            className={`flex-1 sm:flex-none justify-center px-3 py-2 sm:py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 ${
               filterView === 'pinned'
                 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
                 : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
@@ -375,7 +372,7 @@ export const SchoolUpdatesView: React.FC<SchoolUpdatesViewProps> = ({
           <button
             type="button"
             onClick={() => setFilterView(filterView === 'bookmarked' ? 'all' : 'bookmarked')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 ${
+            className={`flex-1 sm:flex-none justify-center px-3 py-2 sm:py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 ${
               filterView === 'bookmarked'
                 ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-sm'
                 : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
